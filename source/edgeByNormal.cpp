@@ -7,6 +7,14 @@
 namespace EdgeByNormal
 {
 
+static const char* SRVNAME_TOOL = "select.edgesByNormal";
+
+#define ATTRs_OPENEDGE  "openEdge"
+#define ATTRs_DESELECT  "deselect"
+
+#define ATTRa_OPENEDGE   0
+#define ATTRa_DESELECT   1
+
 /*
  * On create we add our one tool attribute. We also allocate a vector type
  * and select mode mask.
@@ -22,9 +30,6 @@ CSelectEdgesByNormal::CSelectEdgesByNormal()
         { 0, "=open_edges" }, 0
     };
 
-    dyna_Add(ATTRs_VECTOR_X, LXsTYPE_FLOAT);
-    dyna_Add(ATTRs_VECTOR_Y, LXsTYPE_FLOAT);
-    dyna_Add(ATTRs_VECTOR_Z, LXsTYPE_FLOAT);
     dyna_Add(ATTRs_OPENEDGE, LXsTYPE_INTEGER);
     dyna_SetHint(ATTRa_OPENEDGE, open_edges);
     dyna_Add(ATTRs_DESELECT, LXsTYPE_BOOLEAN);
@@ -56,9 +61,6 @@ CSelectEdgesByNormal::CSelectEdgesByNormal()
  */
 void CSelectEdgesByNormal::tool_Reset()
 {
-    dyna_Value(ATTRa_VECTOR_X).SetFlt(0.0);
-    dyna_Value(ATTRa_VECTOR_Y).SetFlt(1.0);
-    dyna_Value(ATTRa_VECTOR_Z).SetFlt(0.0);
     dyna_Value(ATTRa_OPENEDGE).SetInt(OPENEDGE_OUTVECTOR);
     dyna_Value(ATTRa_DESELECT).SetInt(0);
 }
@@ -89,7 +91,7 @@ LXtID4 CSelectEdgesByNormal::tool_Task()
  */
 unsigned CSelectEdgesByNormal::tmod_Flags()
 {
-    return 0;
+    return LXfTMOD_I0_INPUT;
 }
 
 LxResult CSelectEdgesByNormal::tmod_Enable(ILxUnknownID obj)
@@ -101,6 +103,15 @@ LxResult CSelectEdgesByNormal::tmod_Enable(ILxUnknownID obj)
     {
         msg.SetCode(LXe_CMD_DISABLED);
         msg.SetMessage(SRVNAME_TOOL, "NoVertex", 0);
+        return LXe_DISABLED;
+    }
+
+    CLxUser_Mesh mesh;
+    CLxUser_Edge edge;
+    if (GetLastEdge(mesh, edge) == false)
+    {
+        msg.SetCode(LXe_CMD_DISABLED);
+        msg.SetMessage(SRVNAME_TOOL, "NoEdgeSelected", 0);
         return LXe_DISABLED;
     }
     return LXe_OK;
@@ -189,34 +200,27 @@ static CLxVector GetEdgeNormal(CLxUser_Mesh& mesh, CLxUser_Edge& edge, int openE
     return CLxVector(0.0, 1.0, 0.0);
 }
 
-void CSelectEdgesByNormal::tmod_Initialize (ILxUnknownID vts, ILxUnknownID adjust, unsigned int flags)
+bool CSelectEdgesByNormal::GetLastEdge(CLxUser_Mesh& mesh, CLxUser_Edge& edge)
 {
-    CLxUser_AdjustTool at(adjust);
     int count = s_sel.Count(LXiSEL_EDGE);
     if (count == 0)
     {
-        at.SetFlt(ATTRa_VECTOR_X, 0.0);
-        at.SetFlt(ATTRa_VECTOR_Y, 1.0);
-        at.SetFlt(ATTRa_VECTOR_Z, 0.0);
-        return;
+        return false;
     }
     void* pkt = s_sel.ByIndex(LXiSEL_EDGE, static_cast<unsigned>(count -1));
 	CLxUser_EdgePacketTranslation edge_pkt_trans;
 	edge_pkt_trans.autoInit();
     LXtPointID vrt0, vrt1;
     edge_pkt_trans.Vertices(pkt, &vrt0, &vrt1);
-    CLxUser_Mesh mesh;
     edge_pkt_trans.GetMesh(pkt, mesh);
     CLxUser_Mesh inst = GetInstance(mesh);
-    CLxUser_Edge edge;
     edge.fromMesh(inst);
     edge.SelectEndpoints(vrt0, vrt1);
-    int openEdge;
-    dyna_Value(ATTRa_OPENEDGE).GetInt(&openEdge);
-    CLxVector normal = GetEdgeNormal(inst, edge, openEdge);
-    at.SetFlt(ATTRa_VECTOR_X, normal[0]);
-    at.SetFlt(ATTRa_VECTOR_Y, normal[1]);
-    at.SetFlt(ATTRa_VECTOR_Z, normal[2]);
+    return true;
+}
+
+void CSelectEdgesByNormal::tmod_Initialize (ILxUnknownID vts, ILxUnknownID adjust, unsigned int flags)
+{
 }
 
 LxResult CSelectEdgesByNormal::atrui_DisableMsg (unsigned int index, ILxUnknownID msg)
@@ -308,6 +312,12 @@ public:
 
     LxResult Evaluate()
     {
+        if (m_deselect == 0)
+        {
+            if (m_edge.ID() == m_lastEdge.ID())
+                return LXe_OK;
+        }
+
         CLxVector normal = GetEdgeNormal(m_mesh, m_edge, m_openEdge);
 
         if (Test(normal) == true)
@@ -324,7 +334,9 @@ public:
     CLxUser_Point   m_vert;
     LXtMarkMode     m_mark_pick;
     CLxVector       m_normal;
+    CLxUser_Edge    m_lastEdge;
     int             m_openEdge;
+    int             m_deselect;
     std::vector<LXtEdgeID> m_edges;
 };
 
@@ -334,7 +346,7 @@ public:
  */
 void CSelectEdgesByNormal::tool_Evaluate(ILxUnknownID vts)
 {
-    std::cout << "CSelectEdgesByNormal::tool_Evaluate: " << std::endl;
+    std::cout << "** CSelectEdgesByNormal::tool_Evaluate: " << std::endl;
 
     CLxUser_VectorStack vec(vts);
     CLxUser_Subject2Packet subject;
@@ -343,15 +355,16 @@ void CSelectEdgesByNormal::tool_Evaluate(ILxUnknownID vts)
 
 	LXpToolViewEvent* viewEvent = (LXpToolViewEvent *) vec.Read (offset_view);
     if (!viewEvent || viewEvent->type != LXi_VIEWTYPE_3D)
-            return;
+        return;
 
     EdgeVisitor vis;
-    double x, y, z;
-    dyna_Value(ATTRa_VECTOR_X).GetFlt(&x);
-    dyna_Value(ATTRa_VECTOR_Y).GetFlt(&y);
-    dyna_Value(ATTRa_VECTOR_Z).GetFlt(&z);
-    vis.m_normal = CLxVector(x,y,z);
+    
+    if (GetLastEdge(vis.m_mesh, vis.m_lastEdge) == false)
+        return;
     dyna_Value(ATTRa_OPENEDGE).GetInt(&vis.m_openEdge);
+
+    vis.m_normal = GetEdgeNormal(vis.m_mesh, vis.m_lastEdge, vis.m_openEdge);
+    printf("** last edge normal %f %f %f\n", vis.m_normal[0], vis.m_normal[1], vis.m_normal[2]);
 
     CLxUser_LayerScan  scan;
     s_layer.BeginScan(LXf_LAYERSCAN_ACTIVE | LXf_LAYERSCAN_MARKEDGES | LXf_LAYERSCAN_MARKVERTS, scan);
@@ -360,8 +373,7 @@ void CSelectEdgesByNormal::tool_Evaluate(ILxUnknownID vts)
 	CLxUser_EdgePacketTranslation edge_pkt_trans;
 	edge_pkt_trans.autoInit();
 
-    int deselect;
-    dyna_Value(ATTRa_DESELECT).GetInt(&deselect);
+    dyna_Value(ATTRa_DESELECT).GetInt(&vis.m_deselect);
 
     s_sel.StartBatch();
 
@@ -384,7 +396,7 @@ void CSelectEdgesByNormal::tool_Evaluate(ILxUnknownID vts)
 			void* pkt = edge_pkt_trans.Packet(vert0, vert1, nullptr, mesh);
             if (pkt)
             {
-                if (deselect)
+                if (vis.m_deselect)
                     s_sel.Deselect(LXiSEL_EDGE, pkt);
                 else
                     s_sel.Select(LXiSEL_EDGE, pkt);

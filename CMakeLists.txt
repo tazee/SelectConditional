@@ -57,6 +57,7 @@ add_library(selectConditional SHARED
     source/initialize.cpp
     source/edgeByLength.cpp
     source/edgeByNormal.cpp
+    source/edgeByAngle.cpp
 )
 
 target_include_directories(selectConditional PRIVATE

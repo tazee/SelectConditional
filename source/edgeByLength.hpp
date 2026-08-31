@@ -35,17 +35,6 @@
 namespace EdgeByLength
 {
 
-static const char* SRVNAME_TOOL = "select.edgesByLength";
-
-#define ATTRs_LENGTH    "length"
-#define ATTRs_OPERATOR  "operator"
-#define ATTRs_DESELECT  "deselect"
-
-#define ATTRa_LENGTH     0
-#define ATTRa_OPERATOR   1
-#define ATTRa_DESELECT   2
-
-
 #ifndef LXx_OVERRIDE
 #define LXx_OVERRIDE override
 #endif

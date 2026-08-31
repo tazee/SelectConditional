@@ -1,19 +1,20 @@
 //
-// SelectEdgesByLength - A plugin for selecting edges by edge length
+// SelectEdgesByAngle - A plugin for selecting edges by edge angle
 //
 
-#include "edgeByLength.hpp"
+#include "edgeByAngle.hpp"
+#include "lxsdk/lxu_math.hpp"
 
-namespace EdgeByLength
+namespace EdgeByAngle
 {
 
-static const char* SRVNAME_TOOL = "select.edgesByLength";
+static const char* SRVNAME_TOOL = "select.edgesByAngle";
 
-#define ATTRs_LENGTH    "length"
+#define ATTRs_ANGLE     "angle"
 #define ATTRs_OPERATOR  "operator"
 #define ATTRs_DESELECT  "deselect"
 
-#define ATTRa_LENGTH     0
+#define ATTRa_ANGLE      0
 #define ATTRa_OPERATOR   1
 #define ATTRa_DESELECT   2
 
@@ -21,7 +22,7 @@ static const char* SRVNAME_TOOL = "select.edgesByLength";
  * On create we add our one tool attribute. We also allocate a vector type
  * and select mode mask.
  */
-CSelectEdgesByLength::CSelectEdgesByLength()
+CSelectEdgesByAngle::CSelectEdgesByAngle()
 {
     CLxUser_PacketService sPkt;
     CLxUser_MeshService   sMesh;
@@ -33,7 +34,7 @@ CSelectEdgesByLength::CSelectEdgesByLength()
         { 0, "=comparison_operators" }, 0
     };
 
-    dyna_Add(ATTRs_LENGTH, LXsTYPE_DISTANCE);
+    dyna_Add(ATTRs_ANGLE, LXsTYPE_ANGLE);
     dyna_Add(ATTRs_OPERATOR, LXsTYPE_INTEGER);
     dyna_SetHint(ATTRa_OPERATOR, comparison_operators);
     dyna_Add(ATTRs_DESELECT, LXsTYPE_BOOLEAN);
@@ -63,9 +64,9 @@ CSelectEdgesByLength::CSelectEdgesByLength()
 /*
  * Reset sets the attributes back to defaults.
  */
-void CSelectEdgesByLength::tool_Reset()
+void CSelectEdgesByAngle::tool_Reset()
 {
-    dyna_Value(ATTRa_LENGTH).SetFlt(0.0);
+    dyna_Value(ATTRa_ANGLE).SetFlt(0.0);
     dyna_Value(ATTRa_OPERATOR).SetInt(OPERATOR_GREATERTHAN);
     dyna_Value(ATTRa_DESELECT).SetInt(0);
 }
@@ -73,17 +74,17 @@ void CSelectEdgesByLength::tool_Reset()
 /*
  * Boilerplate methods that identify this as an action (state altering) tool.
  */
-LXtObjectID CSelectEdgesByLength::tool_VectorType()
+LXtObjectID CSelectEdgesByAngle::tool_VectorType()
 {
     return v_type.m_loc;  // peek method; does not add-ref
 }
 
-const char* CSelectEdgesByLength::tool_Order()
+const char* CSelectEdgesByAngle::tool_Order()
 {
     return LXs_ORD_ACTR;
 }
 
-LXtID4 CSelectEdgesByLength::tool_Task()
+LXtID4 CSelectEdgesByAngle::tool_Task()
 {
     return LXi_TASK_ACTR;
 }
@@ -94,12 +95,12 @@ LXtID4 CSelectEdgesByLength::tool_Task()
  * Initialize() which is what to do when the tool activates or re-activates.
  * In this case set the axis to the current value.
  */
-unsigned CSelectEdgesByLength::tmod_Flags()
+unsigned CSelectEdgesByAngle::tmod_Flags()
 {
     return LXfTMOD_I0_ATTRHAUL;
 }
 
-LxResult CSelectEdgesByLength::tmod_Enable(ILxUnknownID obj)
+LxResult CSelectEdgesByAngle::tmod_Enable(ILxUnknownID obj)
 {
     CLxUser_Message msg(obj);
     unsigned int primary_index = 0;
@@ -113,21 +114,75 @@ LxResult CSelectEdgesByLength::tmod_Enable(ILxUnknownID obj)
     return LXe_OK;
 }
 
-const char* CSelectEdgesByLength::tmod_Haul(unsigned index)
+const char* CSelectEdgesByAngle::tmod_Haul(unsigned index)
 {
     if (index == 0)
-        return ATTRs_LENGTH;
+        return ATTRs_ANGLE;
     else
         return nullptr;
 }
 
-void CSelectEdgesByLength::tmod_Initialize (ILxUnknownID vts, ILxUnknownID adjust, unsigned int flags)
+static CLxVector NormalTriangle(LXtFVector v0, LXtFVector v1, LXtFVector vn)
+{
+    LXtVector d0, d1, dn;
+
+    LXx_VSUB3  (d0, v1, v0);
+    LXx_VSUB3  (d1, vn, v0);
+    LXx_VCROSS (dn, d0, d1);
+
+    CLxVector vec(dn);
+    vec.normalize();
+    return vec;
+}
+
+static CLxVector CornerNormal(CLxUser_Mesh& mesh, LXtPolygonID pol,  LXtPointID vrt0, LXtPointID vrt1)
+{
+    LXtFVector pos, posN, posP;
+    CLxUser_Polygon poly;
+    poly.fromMesh(mesh);
+    poly.Select(pol);
+
+    CLxUser_Point point;
+    point.fromMesh(mesh);
+
+    LXtPointID next, prev;
+    unsigned nvert, i;
+    poly.VertexCount(&nvert);
+
+    point.Select(vrt0);
+    point.Pos(pos);
+    poly.PointIndex(vrt0, &i);
+    poly.VertexByIndex((i + 1) % nvert, &next);
+    poly.VertexByIndex((i + nvert - 1) % nvert, &prev);
+    point.Select(next);
+    point.Pos(posN);
+    point.Select(prev);
+    point.Pos(posP);
+    CLxVector norm0 = NormalTriangle(posP, pos, posN);
+
+    point.Select(vrt1);
+    point.Pos(pos);
+    poly.PointIndex(vrt1, &i);
+    poly.VertexByIndex((i + 1) % nvert, &next);
+    poly.VertexByIndex((i + nvert - 1) % nvert, &prev);
+    point.Select(next);
+    point.Pos(posN);
+    point.Select(prev);
+    point.Pos(posP);
+    CLxVector norm1 = NormalTriangle(posP, pos, posN);
+
+    norm0 += norm1;
+    norm0.normalize();
+    return norm0;
+}
+
+void CSelectEdgesByAngle::tmod_Initialize (ILxUnknownID vts, ILxUnknownID adjust, unsigned int flags)
 {
     CLxUser_AdjustTool at(adjust);
     int count = s_sel.Count(LXiSEL_EDGE);
     if (count == 0)
     {
-        at.SetFlt(ATTRa_LENGTH, 0.0);
+        at.SetFlt(ATTRa_ANGLE, 0.0);
         return;
     }
     void* pkt = s_sel.ByIndex(LXiSEL_EDGE, static_cast<unsigned>(count -1));
@@ -138,34 +193,65 @@ void CSelectEdgesByLength::tmod_Initialize (ILxUnknownID vts, ILxUnknownID adjus
     CLxUser_Mesh mesh;
     edge_pkt_trans.GetMesh(pkt, mesh);
     CLxUser_Mesh inst = GetInstance(mesh);
-    CLxUser_Point point;
-    LXtFVector pos0, pos1;
-    point.fromMesh(inst);
-    point.Select(vrt0);
-    point.Pos(pos0);
-    point.Select(vrt1);
-    point.Pos(pos1);
-    double length = LXx_VDIST(pos0, pos1);
-    at.SetFlt(ATTRa_LENGTH, length);
+
+    CLxUser_Edge edge;
+    edge.fromMesh(inst);
+    edge.SelectEndpoints(vrt0, vrt1);
+    unsigned int npol;
+    edge.PolygonCount(&npol);
+    if (npol != 2)
+    {
+        at.SetFlt(ATTRa_ANGLE, 0.0);
+        return;
+    }
+    LXtPolygonID pol0, pol1;
+    edge.PolygonByIndex(0, &pol0);
+    edge.PolygonByIndex(1, &pol1);
+
+    CLxUser_Polygon poly;
+    poly.fromMesh(inst);
+    LXtID4 type;
+    poly.Select(pol0);
+    poly.Type(&type);
+    if (type != LXiPTYP_FACE)
+    {
+        at.SetFlt(ATTRa_ANGLE, 0.0);
+        return;
+    }
+    poly.Select(pol1);
+    poly.Type(&type);
+    if (type != LXiPTYP_FACE)
+    {
+        at.SetFlt(ATTRa_ANGLE, 0.0);
+        return;
+    }
+
+    CLxVector norm0 = CornerNormal(inst, pol0, vrt0, vrt1);
+    CLxVector norm1 = CornerNormal(inst, pol1, vrt0, vrt1);
+
+    double dot = norm0.dot(norm1);
+    double angle = std::acos(dot);
+    printf("** Initialize angle = %f dot %f %f\n", angle * LXx_RAD2DEG, dot, std::cos(angle));
+    at.SetFlt(ATTRa_ANGLE, angle);
 }
 
-LxResult CSelectEdgesByLength::atrui_DisableMsg (unsigned int index, ILxUnknownID msg)
+LxResult CSelectEdgesByAngle::atrui_DisableMsg (unsigned int index, ILxUnknownID msg)
 {
     return LXe_OK;
 }
 
-LxResult CSelectEdgesByLength::atrui_UIHints(unsigned int index, ILxUnknownID hints)
+LxResult CSelectEdgesByAngle::atrui_UIHints(unsigned int index, ILxUnknownID hints)
 {
 	CLxLoc_UIHints		 uiHints(hints);
 
-    if (index == ATTRa_LENGTH)
+    if (index == ATTRa_ANGLE)
     {
         uiHints.MinFloat(0.0);
     }
     return LXe_OK;
 }
 
-bool CSelectEdgesByLength::TestVertex(unsigned int& primary_index)
+bool CSelectEdgesByAngle::TestVertex(unsigned int& primary_index)
 {
     /*
      * Start the scan in read-only mode.
@@ -202,7 +288,7 @@ bool CSelectEdgesByLength::TestVertex(unsigned int& primary_index)
     return ok;
 }
 
-CLxUser_Mesh CSelectEdgesByLength::GetInstance(CLxUser_Mesh& base)
+CLxUser_Mesh CSelectEdgesByAngle::GetInstance(CLxUser_Mesh& base)
 {
     CLxUser_LayerScan  scan;
     s_layer.BeginScan(LXf_LAYERSCAN_ACTIVE, scan);
@@ -223,21 +309,21 @@ CLxUser_Mesh CSelectEdgesByLength::GetInstance(CLxUser_Mesh& base)
 class EdgeVisitor : public CLxImpl_AbstractVisitor
 {
 public:
-    bool Test(double length)
+    bool Test(double dot)
     {
-        if (m_operator == CSelectEdgesByLength::OPERATOR_EQUAL)
+        if (m_operator == CSelectEdgesByAngle::OPERATOR_EQUAL)
         {
-            if (lx::Compare(length, m_length) == 0)
+            if (lx::Compare(dot, std::cos(m_angle)) == 0)
                 return true;
         }
-        else if (m_operator == CSelectEdgesByLength::OPERATOR_LESSTHAN)
+        else if (m_operator == CSelectEdgesByAngle::OPERATOR_LESSTHAN)
         {
-            if (length < m_length)
+            if (dot < std::cos(m_angle))
                 return true;
         }
-        else if (m_operator == CSelectEdgesByLength::OPERATOR_GREATERTHAN)
+        else if (m_operator == CSelectEdgesByAngle::OPERATOR_GREATERTHAN)
         {
-            if (length > m_length)
+            if (dot > std::cos(m_angle))
                 return true;
         }
         return false;
@@ -245,18 +331,31 @@ public:
 
     LxResult Evaluate()
     {
+        unsigned int count;
+        m_edge.PolygonCount(&count);
+        if (count != 2)
+            return LXe_OK;
+
+        LXtPolygonID pol0, pol1;
+        m_edge.PolygonByIndex(0, &pol0);
+        m_edge.PolygonByIndex(1, &pol1);
+
         LXtPointID vrt0, vrt1;
         m_edge.Endpoints(&vrt0, &vrt1);
+    
+        LXtID4 type;
+        m_poly.Select(pol0);
+        m_poly.Type(&type);
+        if (type != LXiPTYP_FACE)
+            return LXe_OK;
+        m_poly.Select(pol1);
+        m_poly.Type(&type);
+        if (type != LXiPTYP_FACE)
+            return LXe_OK;
+    
+        double dot = DotPolygons(pol0, pol1, vrt0, vrt1);
 
-        LXtFVector pos0, pos1;
-        m_vert.Select(vrt0);
-        m_vert.Pos(pos0);
-        m_vert.Select(vrt1);
-        m_vert.Pos(pos1);
-
-        double length = LXx_VDIST(pos0, pos1);
-
-        if (Test(length) == true)
+        if (Test(dot) == true)
         {
             m_edges.push_back(m_edge.ID());
             return LXe_OK;
@@ -265,11 +364,20 @@ public:
         return LXe_OK;
     }
 
+    double DotPolygons(LXtPolygonID pol0, LXtPolygonID pol1, LXtPointID vrt0, LXtPointID vrt1)
+    {
+        CLxVector norm0 = CornerNormal(m_mesh, pol0, vrt0, vrt1);
+        CLxVector norm1 = CornerNormal(m_mesh, pol1, vrt0, vrt1);
+        double dot = norm0.dot(norm1);
+        return dot;
+    }
+
     CLxUser_Mesh    m_mesh;
     CLxUser_Edge    m_edge;
     CLxUser_Point   m_vert;
+    CLxUser_Polygon m_poly;
     LXtMarkMode     m_mark_pick;
-    double          m_length;
+    double          m_angle;
     int             m_operator;
     std::vector<LXtEdgeID> m_edges;
 };
@@ -278,9 +386,9 @@ public:
  * Tool evaluation uses layer scan interface to walk through all the active
  * meshes and visit all the selected polygons.
  */
-void CSelectEdgesByLength::tool_Evaluate(ILxUnknownID vts)
+void CSelectEdgesByAngle::tool_Evaluate(ILxUnknownID vts)
 {
-    std::cout << "CSelectEdgesByLength::tool_Evaluate: " << std::endl;
+    std::cout << "CSelectEdgesByAngle::tool_Evaluate: " << std::endl;
 
     CLxUser_VectorStack vec(vts);
     CLxUser_Subject2Packet subject;
@@ -292,14 +400,8 @@ void CSelectEdgesByLength::tool_Evaluate(ILxUnknownID vts)
             return;
 
     EdgeVisitor vis;
-    dyna_Value(ATTRa_LENGTH).GetFlt(&vis.m_length);
+    dyna_Value(ATTRa_ANGLE).GetFlt(&vis.m_angle);
     dyna_Value(ATTRa_OPERATOR).GetInt(&vis.m_operator);
-
-    if (vis.m_length < 0.0)
-    {
-        vis.m_length = 0.0;
-        dyna_Value(ATTRa_LENGTH).SetFlt(vis.m_length);
-    }
 
     CLxUser_LayerScan  scan;
     s_layer.BeginScan(LXf_LAYERSCAN_ACTIVE | LXf_LAYERSCAN_MARKEDGES | LXf_LAYERSCAN_MARKVERTS, scan);
@@ -320,6 +422,7 @@ void CSelectEdgesByLength::tool_Evaluate(ILxUnknownID vts)
         vis.m_mesh = mesh;
         vis.m_edge.fromMesh(mesh);
         vis.m_vert.fromMesh(mesh);
+        vis.m_poly.fromMesh(mesh);
         vis.m_mark_pick = mesh_svc.SetMode(LXsMARK_SELECT);
 
         vis.m_edge.Enum(&vis, LXiMARK_ANY);
@@ -355,12 +458,12 @@ void initialize()
 {
     CLxGenericPolymorph* srv;
 
-    srv = new CLxPolymorph<CSelectEdgesByLength>;
-    srv->AddInterface(new CLxIfc_Tool<CSelectEdgesByLength>);
-    srv->AddInterface(new CLxIfc_ToolModel<CSelectEdgesByLength>);
-    srv->AddInterface(new CLxIfc_Attributes<CSelectEdgesByLength>);
-    srv->AddInterface(new CLxIfc_AttributesUI<CSelectEdgesByLength>);
-    srv->AddInterface(new CLxIfc_ChannelUI<CSelectEdgesByLength>);
+    srv = new CLxPolymorph<CSelectEdgesByAngle>;
+    srv->AddInterface(new CLxIfc_Tool<CSelectEdgesByAngle>);
+    srv->AddInterface(new CLxIfc_ToolModel<CSelectEdgesByAngle>);
+    srv->AddInterface(new CLxIfc_Attributes<CSelectEdgesByAngle>);
+    srv->AddInterface(new CLxIfc_AttributesUI<CSelectEdgesByAngle>);
+    srv->AddInterface(new CLxIfc_ChannelUI<CSelectEdgesByAngle>);
     lx::AddServer(SRVNAME_TOOL, srv);
 }
 };
