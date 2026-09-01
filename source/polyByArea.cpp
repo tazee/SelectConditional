@@ -1,19 +1,19 @@
 //
-// SelectEdgesByLength - A plugin for selecting edges by edge length
+// SelectPolysByArea - A plugin for selecting polygons by area
 //
 
-#include "edgeByLength.hpp"
+#include "polyByArea.hpp"
 
-namespace EdgeByLength
+namespace PolyByArea
 {
 
-    static const char* SRVNAME_TOOL = "select.edgesByLength";
+    static const char* SRVNAME_TOOL = "select.polysByArea";
 
-#define ATTRs_LENGTH   "length"
+#define ATTRs_AREA     "area"
 #define ATTRs_OPERATOR "operator"
 #define ATTRs_DESELECT "deselect"
 
-#define ATTRa_LENGTH   0
+#define ATTRa_AREA     0
 #define ATTRa_OPERATOR 1
 #define ATTRa_DESELECT 2
 
@@ -21,7 +21,7 @@ namespace EdgeByLength
      * On create we add our one tool attribute. We also allocate a vector type
      * and select mode mask.
      */
-    CSelectEdgesByLength::CSelectEdgesByLength()
+    CSelectPolysByArea::CSelectPolysByArea()
     {
         CLxUser_PacketService sPkt;
         CLxUser_MeshService   sMesh;
@@ -30,7 +30,7 @@ namespace EdgeByLength
             { OPERATOR_LESSTHAN, "less_than" }, { OPERATOR_EQUAL, "equal" }, { OPERATOR_GREATERTHAN, "greater_than" }, { 0, "=comparison_operators" }, 0
         };
 
-        dyna_Add(ATTRs_LENGTH, LXsTYPE_DISTANCE);
+        dyna_Add(ATTRs_AREA, LXsTYPE_DISTANCE);
         dyna_Add(ATTRs_OPERATOR, LXsTYPE_INTEGER);
         dyna_SetHint(ATTRa_OPERATOR, comparison_operators);
         dyna_Add(ATTRs_DESELECT, LXsTYPE_BOOLEAN);
@@ -60,9 +60,9 @@ namespace EdgeByLength
     /*
      * Reset sets the attributes back to defaults.
      */
-    void CSelectEdgesByLength::tool_Reset()
+    void CSelectPolysByArea::tool_Reset()
     {
-        dyna_Value(ATTRa_LENGTH).SetFlt(0.0);
+        dyna_Value(ATTRa_AREA).SetFlt(0.0);
         dyna_Value(ATTRa_OPERATOR).SetInt(OPERATOR_EQUAL);
         dyna_Value(ATTRa_DESELECT).SetInt(0);
     }
@@ -70,17 +70,17 @@ namespace EdgeByLength
     /*
      * Boilerplate methods that identify this as an action (state altering) tool.
      */
-    LXtObjectID CSelectEdgesByLength::tool_VectorType()
+    LXtObjectID CSelectPolysByArea::tool_VectorType()
     {
         return v_type.m_loc;  // peek method; does not add-ref
     }
 
-    const char* CSelectEdgesByLength::tool_Order()
+    const char* CSelectPolysByArea::tool_Order()
     {
         return LXs_ORD_ACTR;
     }
 
-    LXtID4 CSelectEdgesByLength::tool_Task()
+    LXtID4 CSelectPolysByArea::tool_Task()
     {
         return LXi_TASK_ACTR;
     }
@@ -91,12 +91,12 @@ namespace EdgeByLength
      * Initialize() which is what to do when the tool activates or re-activates.
      * In this case set the axis to the current value.
      */
-    unsigned CSelectEdgesByLength::tmod_Flags()
+    unsigned CSelectPolysByArea::tmod_Flags()
     {
         return LXfTMOD_I0_ATTRHAUL;
     }
 
-    LxResult CSelectEdgesByLength::tmod_Enable(ILxUnknownID obj)
+    LxResult CSelectPolysByArea::tmod_Enable(ILxUnknownID obj)
     {
         CLxUser_Message msg(obj);
         unsigned int    primary_index = 0;
@@ -110,59 +110,56 @@ namespace EdgeByLength
         return LXe_OK;
     }
 
-    const char* CSelectEdgesByLength::tmod_Haul(unsigned index)
+    const char* CSelectPolysByArea::tmod_Haul(unsigned index)
     {
         if (index == 0)
-            return ATTRs_LENGTH;
+            return ATTRs_AREA;
         else
             return nullptr;
     }
 
-    void CSelectEdgesByLength::tmod_Initialize(ILxUnknownID vts, ILxUnknownID adjust, unsigned int flags)
+    void CSelectPolysByArea::tmod_Initialize(ILxUnknownID vts, ILxUnknownID adjust, unsigned int flags)
     {
         CLxUser_AdjustTool at(adjust);
-        int                count = s_sel.Count(LXiSEL_EDGE);
+        int                count = s_sel.Count(LXiSEL_POLYGON);
         if (count == 0)
         {
-            at.SetFlt(ATTRa_LENGTH, 0.0);
+            at.SetFlt(ATTRa_AREA, 0.0);
             return;
         }
-        void*                         pkt = s_sel.ByIndex(LXiSEL_EDGE, static_cast<unsigned>(count - 1));
-        CLxUser_EdgePacketTranslation edge_pkt_trans;
-        edge_pkt_trans.autoInit();
-        LXtPointID vrt0, vrt1;
-        edge_pkt_trans.Vertices(pkt, &vrt0, &vrt1);
+        void*                            pkt = s_sel.ByIndex(LXiSEL_POLYGON, static_cast<unsigned>(count - 1));
+        CLxUser_PolygonPacketTranslation poly_pkt_trans;
+        poly_pkt_trans.autoInit();
+        LXtPolygonID pol;
+        poly_pkt_trans.Polygon(pkt, &pol);
         CLxUser_Mesh mesh;
-        edge_pkt_trans.GetMesh(pkt, mesh);
-        CLxUser_Mesh  inst = GetInstance(mesh);
-        CLxUser_Point point;
-        LXtFVector    pos0, pos1;
-        point.fromMesh(inst);
-        point.Select(vrt0);
-        point.Pos(pos0);
-        point.Select(vrt1);
-        point.Pos(pos1);
-        double length = LXx_VDIST(pos0, pos1);
-        at.SetFlt(ATTRa_LENGTH, length);
+        poly_pkt_trans.GetMesh(pkt, mesh);
+        CLxUser_Mesh    inst = GetInstance(mesh);
+        CLxUser_Polygon poly;
+        poly.fromMesh(inst);
+        poly.Select(pol);
+        double area;
+        poly.Area(&area);
+        at.SetFlt(ATTRa_AREA, area);
     }
 
-    LxResult CSelectEdgesByLength::atrui_DisableMsg(unsigned int index, ILxUnknownID msg)
+    LxResult CSelectPolysByArea::atrui_DisableMsg(unsigned int index, ILxUnknownID msg)
     {
         return LXe_OK;
     }
 
-    LxResult CSelectEdgesByLength::atrui_UIHints(unsigned int index, ILxUnknownID hints)
+    LxResult CSelectPolysByArea::atrui_UIHints(unsigned int index, ILxUnknownID hints)
     {
         CLxLoc_UIHints uiHints(hints);
 
-        if (index == ATTRa_LENGTH)
+        if (index == ATTRa_AREA)
         {
             uiHints.MinFloat(0.0);
         }
         return LXe_OK;
     }
 
-    bool CSelectEdgesByLength::TestVertex(unsigned int& primary_index)
+    bool CSelectPolysByArea::TestVertex(unsigned int& primary_index)
     {
         /*
          * Start the scan in read-only mode.
@@ -182,7 +179,7 @@ namespace EdgeByLength
             for (i = 0; i < n; i++)
             {
                 scan.BaseMeshByIndex(i, mesh);
-                mesh.PointCount(&count);
+                mesh.PolygonCount(&count);
                 if (count > 0)
                 {
                     ok            = true;
@@ -199,7 +196,7 @@ namespace EdgeByLength
         return ok;
     }
 
-    CLxUser_Mesh CSelectEdgesByLength::GetInstance(CLxUser_Mesh& base)
+    CLxUser_Mesh CSelectPolysByArea::GetInstance(CLxUser_Mesh& base)
     {
         CLxUser_LayerScan scan;
         s_layer.BeginScan(LXf_LAYERSCAN_ACTIVE, scan);
@@ -217,24 +214,30 @@ namespace EdgeByLength
         return base;
     }
 
-    class EdgeVisitor : public CLxImpl_AbstractVisitor
+    class PolyVisitor : public CLxImpl_AbstractVisitor
     {
     public:
-        bool Test(double length)
+        bool Compare(double a, double b)
         {
-            if (m_operator == CSelectEdgesByLength::OPERATOR_EQUAL)
+            double tol = lx::Tolerance(a) * 10.0;
+            return std::abs(a - b) < tol;
+        }
+
+        bool Test(double area)
+        {
+            if (m_operator == CSelectPolysByArea::OPERATOR_EQUAL)
             {
-                if (lx::Compare(length, m_length) == 0)
+                if (Compare(area, m_area))
                     return true;
             }
-            else if (m_operator == CSelectEdgesByLength::OPERATOR_LESSTHAN)
+            else if (m_operator == CSelectPolysByArea::OPERATOR_LESSTHAN)
             {
-                if (length < m_length)
+                if (area < m_area)
                     return true;
             }
-            else if (m_operator == CSelectEdgesByLength::OPERATOR_GREATERTHAN)
+            else if (m_operator == CSelectPolysByArea::OPERATOR_GREATERTHAN)
             {
-                if (length > m_length)
+                if (area > m_area)
                     return true;
             }
             return false;
@@ -242,42 +245,34 @@ namespace EdgeByLength
 
         LxResult Evaluate()
         {
-            LXtPointID vrt0, vrt1;
-            m_edge.Endpoints(&vrt0, &vrt1);
+            double area;
+            m_poly.Area(&area);
 
-            LXtFVector pos0, pos1;
-            m_vert.Select(vrt0);
-            m_vert.Pos(pos0);
-            m_vert.Select(vrt1);
-            m_vert.Pos(pos1);
-
-            double length = LXx_VDIST(pos0, pos1);
-
-            if (Test(length) == true)
+            if (Test(area) == true)
             {
-                m_edges.push_back(m_edge.ID());
+                m_polys.push_back(m_poly.ID());
                 return LXe_OK;
             }
 
             return LXe_OK;
         }
 
-        CLxUser_Mesh           m_mesh;
-        CLxUser_Edge           m_edge;
-        CLxUser_Point          m_vert;
-        LXtMarkMode            m_mark_pick;
-        double                 m_length;
-        int                    m_operator;
-        std::vector<LXtEdgeID> m_edges;
+        CLxUser_Mesh              m_mesh;
+        CLxUser_Polygon           m_poly;
+        CLxUser_Point             m_vert;
+        LXtMarkMode               m_mark_pick;
+        double                    m_area;
+        int                       m_operator;
+        std::vector<LXtPolygonID> m_polys;
     };
 
     /*
      * Tool evaluation uses layer scan interface to walk through all the active
      * meshes and visit all the selected polygons.
      */
-    void CSelectEdgesByLength::tool_Evaluate(ILxUnknownID vts)
+    void CSelectPolysByArea::tool_Evaluate(ILxUnknownID vts)
     {
-        std::cout << "CSelectEdgesByLength::tool_Evaluate: " << std::endl;
+        std::cout << "CSelectPolysByArea::tool_Evaluate: " << std::endl;
 
         CLxUser_VectorStack    vec(vts);
         CLxUser_Subject2Packet subject;
@@ -288,22 +283,22 @@ namespace EdgeByLength
         if (!viewEvent || viewEvent->type != LXi_VIEWTYPE_3D)
             return;
 
-        EdgeVisitor vis;
-        dyna_Value(ATTRa_LENGTH).GetFlt(&vis.m_length);
+        PolyVisitor vis;
+        dyna_Value(ATTRa_AREA).GetFlt(&vis.m_area);
         dyna_Value(ATTRa_OPERATOR).GetInt(&vis.m_operator);
 
-        if (vis.m_length < 0.0)
+        if (vis.m_area < 0.0)
         {
-            vis.m_length = 0.0;
-            dyna_Value(ATTRa_LENGTH).SetFlt(vis.m_length);
+            vis.m_area = 0.0;
+            dyna_Value(ATTRa_AREA).SetFlt(vis.m_area);
         }
 
         CLxUser_LayerScan scan;
-        s_layer.BeginScan(LXf_LAYERSCAN_ACTIVE | LXf_LAYERSCAN_MARKEDGES | LXf_LAYERSCAN_MARKVERTS, scan);
+        s_layer.BeginScan(LXf_LAYERSCAN_ACTIVE | LXf_LAYERSCAN_MARKPOLYS | LXf_LAYERSCAN_MARKVERTS, scan);
         auto n = scan.NumLayers();
 
-        CLxUser_EdgePacketTranslation edge_pkt_trans;
-        edge_pkt_trans.autoInit();
+        CLxUser_PolygonPacketTranslation poly_pkt_trans;
+        poly_pkt_trans.autoInit();
 
         int deselect;
         dyna_Value(ATTRa_DESELECT).GetInt(&deselect);
@@ -315,33 +310,30 @@ namespace EdgeByLength
             CLxUser_Mesh mesh;
             scan.MeshInstance(i, mesh);
             vis.m_mesh = mesh;
-            vis.m_edge.fromMesh(mesh);
+            vis.m_poly.fromMesh(mesh);
             vis.m_vert.fromMesh(mesh);
             vis.m_mark_pick = mesh_svc.SetMode(LXsMARK_SELECT);
 
-            vis.m_edge.Enum(&vis, LXiMARK_ANY);
+            vis.m_poly.Enum(&vis, LXiMARK_ANY);
 
-            for (auto j = 0u; j < vis.m_edges.size(); j++)
+            for (auto j = 0u; j < vis.m_polys.size(); j++)
             {
-                LXtPointID vert0, vert1;
-                vis.m_edge.Select(vis.m_edges[j]);
-                vis.m_edge.Endpoints(&vert0, &vert1);
-                void* pkt = edge_pkt_trans.Packet(vert0, vert1, nullptr, mesh);
+                void* pkt = poly_pkt_trans.Packet(vis.m_polys[j], mesh);
                 if (pkt)
                 {
                     if (deselect)
-                        s_sel.Deselect(LXiSEL_EDGE, pkt);
+                        s_sel.Deselect(LXiSEL_POLYGON, pkt);
                     else
-                        s_sel.Select(LXiSEL_EDGE, pkt);
+                        s_sel.Select(LXiSEL_POLYGON, pkt);
                 }
             }
         }
         s_sel.EndBatch();
 
-        if (subject.Type() != LXiSEL_EDGE)
+        if (subject.Type() != LXiSEL_POLYGON)
         {
             CLxUser_CommandService cmdSvc;
-            cmdSvc.ExecuteArgString(-1, LXiCTAG_NULL, "select.type edge");
+            cmdSvc.ExecuteArgString(-1, LXiCTAG_NULL, "select.type polygon");
         }
     }
 
@@ -352,12 +344,12 @@ namespace EdgeByLength
     {
         CLxGenericPolymorph* srv;
 
-        srv = new CLxPolymorph<CSelectEdgesByLength>;
-        srv->AddInterface(new CLxIfc_Tool<CSelectEdgesByLength>);
-        srv->AddInterface(new CLxIfc_ToolModel<CSelectEdgesByLength>);
-        srv->AddInterface(new CLxIfc_Attributes<CSelectEdgesByLength>);
-        srv->AddInterface(new CLxIfc_AttributesUI<CSelectEdgesByLength>);
-        srv->AddInterface(new CLxIfc_ChannelUI<CSelectEdgesByLength>);
+        srv = new CLxPolymorph<CSelectPolysByArea>;
+        srv->AddInterface(new CLxIfc_Tool<CSelectPolysByArea>);
+        srv->AddInterface(new CLxIfc_ToolModel<CSelectPolysByArea>);
+        srv->AddInterface(new CLxIfc_Attributes<CSelectPolysByArea>);
+        srv->AddInterface(new CLxIfc_AttributesUI<CSelectPolysByArea>);
+        srv->AddInterface(new CLxIfc_ChannelUI<CSelectPolysByArea>);
         lx::AddServer(SRVNAME_TOOL, srv);
     }
-};  // namespace EdgeByLength
+};  // namespace PolyByArea

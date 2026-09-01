@@ -58,6 +58,8 @@ add_library(selectConditional SHARED
     source/edgeByLength.cpp
     source/edgeByNormal.cpp
     source/edgeByAngle.cpp
+    source/polyByArea.cpp
+    source/random.cpp
 )
 
 target_include_directories(selectConditional PRIVATE
