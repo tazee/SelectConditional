@@ -3,6 +3,7 @@
 //
 
 #include "edgeByLength.hpp"
+#include "util.hpp"
 
 namespace EdgeByLength
 {
@@ -224,7 +225,7 @@ namespace EdgeByLength
         {
             if (m_operator == CSelectEdgesByLength::OPERATOR_EQUAL)
             {
-                if (lx::Compare(length, m_length) == 0)
+                if (MathUtil::Compare(length, m_length))
                     return true;
             }
             else if (m_operator == CSelectEdgesByLength::OPERATOR_LESSTHAN)

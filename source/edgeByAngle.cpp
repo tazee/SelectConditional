@@ -3,7 +3,7 @@
 //
 
 #include "edgeByAngle.hpp"
-#include "lxsdk/lxu_math.hpp"
+#include "util.hpp"
 
 namespace EdgeByAngle
 {
@@ -119,60 +119,6 @@ namespace EdgeByAngle
             return nullptr;
     }
 
-    static CLxVector NormalTriangle(LXtFVector v0, LXtFVector v1, LXtFVector vn)
-    {
-        LXtVector d0, d1, dn;
-
-        LXx_VSUB3(d0, v1, v0);
-        LXx_VSUB3(d1, vn, v0);
-        LXx_VCROSS(dn, d0, d1);
-
-        CLxVector vec(dn);
-        vec.normalize();
-        return vec;
-    }
-
-    static CLxVector CornerNormal(CLxUser_Mesh& mesh, LXtPolygonID pol, LXtPointID vrt0, LXtPointID vrt1)
-    {
-        LXtFVector      pos, posN, posP;
-        CLxUser_Polygon poly;
-        poly.fromMesh(mesh);
-        poly.Select(pol);
-
-        CLxUser_Point point;
-        point.fromMesh(mesh);
-
-        LXtPointID next, prev;
-        unsigned   nvert, i;
-        poly.VertexCount(&nvert);
-
-        point.Select(vrt0);
-        point.Pos(pos);
-        poly.PointIndex(vrt0, &i);
-        poly.VertexByIndex((i + 1) % nvert, &next);
-        poly.VertexByIndex((i + nvert - 1) % nvert, &prev);
-        point.Select(next);
-        point.Pos(posN);
-        point.Select(prev);
-        point.Pos(posP);
-        CLxVector norm0 = NormalTriangle(posP, pos, posN);
-
-        point.Select(vrt1);
-        point.Pos(pos);
-        poly.PointIndex(vrt1, &i);
-        poly.VertexByIndex((i + 1) % nvert, &next);
-        poly.VertexByIndex((i + nvert - 1) % nvert, &prev);
-        point.Select(next);
-        point.Pos(posN);
-        point.Select(prev);
-        point.Pos(posP);
-        CLxVector norm1 = NormalTriangle(posP, pos, posN);
-
-        norm0 += norm1;
-        norm0.normalize();
-        return norm0;
-    }
-
     void CSelectEdgesByAngle::tmod_Initialize(ILxUnknownID vts, ILxUnknownID adjust, unsigned int flags)
     {
         CLxUser_AdjustTool at(adjust);
@@ -223,8 +169,8 @@ namespace EdgeByAngle
             return;
         }
 
-        CLxVector norm0 = CornerNormal(inst, pol0, vrt0, vrt1);
-        CLxVector norm1 = CornerNormal(inst, pol1, vrt0, vrt1);
+        CLxVector norm0 = MathUtil::CornerNormal(inst, pol0, vrt0, vrt1);
+        CLxVector norm1 = MathUtil::CornerNormal(inst, pol1, vrt0, vrt1);
 
         double dot   = norm0.dot(norm1);
         double angle = std::acos(dot);
@@ -309,7 +255,7 @@ namespace EdgeByAngle
         {
             if (m_operator == CSelectEdgesByAngle::OPERATOR_EQUAL)
             {
-                if (lx::Compare(dot, std::cos(m_angle)) == 0)
+                if (MathUtil::Compare(dot, std::cos(m_angle)))
                     return true;
             }
             else if (m_operator == CSelectEdgesByAngle::OPERATOR_LESSTHAN)
@@ -362,8 +308,8 @@ namespace EdgeByAngle
 
         double DotPolygons(LXtPolygonID pol0, LXtPolygonID pol1, LXtPointID vrt0, LXtPointID vrt1)
         {
-            CLxVector norm0 = CornerNormal(m_mesh, pol0, vrt0, vrt1);
-            CLxVector norm1 = CornerNormal(m_mesh, pol1, vrt0, vrt1);
+            CLxVector norm0 = MathUtil::CornerNormal(m_mesh, pol0, vrt0, vrt1);
+            CLxVector norm1 = MathUtil::CornerNormal(m_mesh, pol1, vrt0, vrt1);
             double    dot   = norm0.dot(norm1);
             return dot;
         }

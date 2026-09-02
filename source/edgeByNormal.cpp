@@ -3,6 +3,7 @@
 //
 
 #include "edgeByNormal.hpp"
+#include "util.hpp"
 
 namespace EdgeByNormal
 {
@@ -120,6 +121,9 @@ LxResult CSelectEdgesByNormal::tmod_Enable(ILxUnknownID obj)
 
 static CLxVector GetEdgeNormal(CLxUser_Mesh& mesh, CLxUser_Edge& edge, int openEdge)
 {
+    LXtPointID vrt0, vrt1;
+    edge.Endpoints(&vrt0, &vrt1);
+
     CLxUser_Polygon poly;
     poly.fromMesh(mesh);
     unsigned count;
@@ -151,9 +155,7 @@ static CLxVector GetEdgeNormal(CLxUser_Mesh& mesh, CLxUser_Edge& edge, int openE
         if ((type == LXiPTYP_FACE) || (type == LXiPTYP_SUBD) || (type == LXiPTYP_PSUB))
         {
             poly.Normal(norm0);
-            LXtPointID vrt0, vrt1;
             LXtFVector pos0, pos1;
-            edge.Endpoints(&vrt0, &vrt1);
             CLxUser_Point point;
             point.fromMesh(mesh);
             point.Select(vrt0);
@@ -293,21 +295,11 @@ class EdgeVisitor : public CLxImpl_AbstractVisitor
 public:
     bool Test(CLxVector& normal)
     {
-        if (VectorCompare(normal, m_normal))
+        if (MathUtil::VectorCompare(normal, m_normal))
         {
             return true;
         }
         return false;
-    }
-
-    bool VectorCompare (CLxVector& A, CLxVector B)
-    {
-        if ((lx::Compare(A[0], B[0]) == 0) &&
-            (lx::Compare(A[1], B[1]) == 0) &&
-            (lx::Compare(A[2], B[2]) == 0))
-            return true;
-        else
-            return false;
     }
 
     LxResult Evaluate()

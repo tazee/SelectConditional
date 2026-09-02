@@ -3,6 +3,7 @@
 //
 
 #include "polyByArea.hpp"
+#include "util.hpp"
 
 namespace PolyByArea
 {
@@ -217,17 +218,11 @@ namespace PolyByArea
     class PolyVisitor : public CLxImpl_AbstractVisitor
     {
     public:
-        bool Compare(double a, double b)
-        {
-            double tol = lx::Tolerance(a) * 10.0;
-            return std::abs(a - b) < tol;
-        }
-
         bool Test(double area)
         {
             if (m_operator == CSelectPolysByArea::OPERATOR_EQUAL)
             {
-                if (Compare(area, m_area))
+                if (MathUtil::Compare(area, m_area))
                     return true;
             }
             else if (m_operator == CSelectPolysByArea::OPERATOR_LESSTHAN)
