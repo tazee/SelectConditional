@@ -57,7 +57,7 @@ add_library(selectConditional SHARED
     source/initialize.cpp
     source/edgeByLength.cpp
     source/edgeByNormal.cpp
-    source/edgeByAngle.cpp
+    source/edgeByEdgeVector.cpp
     source/polyByArea.cpp
     source/random.cpp
 )

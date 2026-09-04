@@ -14,9 +14,11 @@ namespace Random
 
 #define ATTRs_SEED       "seed"
 #define ATTRs_PERCENTAGE "percentage"
+#define ATTRs_DESELECT "deselect"
 
 #define ATTRa_SEED       0
 #define ATTRa_PERCENTAGE 1
+#define ATTRa_DESELECT   2
 
     /*
      * On create we add our one tool attribute. We also allocate a vector type
@@ -29,6 +31,7 @@ namespace Random
 
         dyna_Add(ATTRs_SEED, LXsTYPE_INTEGER);
         dyna_Add(ATTRs_PERCENTAGE, LXsTYPE_PERCENT);
+        dyna_Add(ATTRs_DESELECT, LXsTYPE_BOOLEAN);
 
         tool_Reset();
 
@@ -59,6 +62,7 @@ namespace Random
     {
         dyna_Value(ATTRa_SEED).SetInt(1074);
         dyna_Value(ATTRa_PERCENTAGE).SetFlt(0.5);
+        dyna_Value(ATTRa_DESELECT).SetInt(0);
     }
 
     /*
@@ -234,10 +238,21 @@ namespace Random
         if (!viewEvent || viewEvent->type != LXi_VIEWTYPE_3D)
             return;
 
-        int    seed;
+        int    seed, deselect;
         double percentage;
         dyna_Value(ATTRa_SEED).GetInt(&seed);
         dyna_Value(ATTRa_PERCENTAGE).GetFlt(&percentage);
+        dyna_Value(ATTRa_DESELECT).GetInt(&deselect);
+        if (percentage < 0.0)
+        {
+            percentage = 0.0;
+            dyna_Value(ATTRa_PERCENTAGE).SetFlt(0.0);
+        }
+        else if (percentage > 1.0)
+        {
+            percentage = 1.0;
+            dyna_Value(ATTRa_PERCENTAGE).SetFlt(1.0);
+        }
 
         CLxUser_LayerScan scan;
         s_layer.BeginScan(LXf_LAYERSCAN_ACTIVE | LXf_LAYERSCAN_MARKALL, scan);
@@ -288,7 +303,10 @@ namespace Random
                         void* pkt = poly_pkt_trans.Packet(vis.m_polys[j], mesh);
                         if (pkt)
                         {
-                            s_sel.Select(LXiSEL_POLYGON, pkt);
+                            if (deselect)
+                                s_sel.Deselect(LXiSEL_POLYGON, pkt);
+                            else
+                                s_sel.Select(LXiSEL_POLYGON, pkt);
                         }
                     }
                 }
@@ -321,7 +339,10 @@ namespace Random
                         void* pkt = edge_pkt_trans.Packet(vrt0, vrt1, nullptr, mesh);
                         if (pkt)
                         {
-                            s_sel.Select(LXiSEL_EDGE, pkt);
+                            if (deselect)
+                                s_sel.Deselect(LXiSEL_EDGE, pkt);
+                            else
+                                s_sel.Select(LXiSEL_EDGE, pkt);
                         }
                     }
                 }
@@ -352,7 +373,10 @@ namespace Random
                         void* pkt = vert_pkt_trans.Packet(vrt, nullptr, mesh);
                         if (pkt)
                         {
-                            s_sel.Select(LXiSEL_VERTEX, pkt);
+                            if (deselect)
+                                s_sel.Deselect(LXiSEL_VERTEX, pkt);
+                            else
+                                s_sel.Select(LXiSEL_VERTEX, pkt);
                         }
                     }
                 }

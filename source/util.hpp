@@ -85,4 +85,14 @@ namespace MathUtil {
         norm0.normalize();
         return norm0;
     }
+
+    static double VectorAngle(const LXtVector v0, const LXtVector v1, int normalize = 0)
+    {
+        double dot = LXx_VDOT (v0, v1);
+        if (normalize) {
+            dot = dot / (LXx_VLEN (v0) * LXx_VLEN (v1));
+        }
+        dot = LXxCLAMP(dot, -1.0, 1.0);
+        return std::acos (dot);
+    }
 };

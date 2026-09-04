@@ -12,9 +12,11 @@ static const char* SRVNAME_TOOL = "select.edgesByNormal";
 
 #define ATTRs_OPENEDGE  "openEdge"
 #define ATTRs_DESELECT  "deselect"
+#define ATTRs_TOLERANCE "tolerance"
 
 #define ATTRa_OPENEDGE   0
 #define ATTRa_DESELECT   1
+#define ATTRa_TOLERANCE 2
 
 /*
  * On create we add our one tool attribute. We also allocate a vector type
@@ -34,7 +36,7 @@ CSelectEdgesByNormal::CSelectEdgesByNormal()
     dyna_Add(ATTRs_OPENEDGE, LXsTYPE_INTEGER);
     dyna_SetHint(ATTRa_OPENEDGE, open_edges);
     dyna_Add(ATTRs_DESELECT, LXsTYPE_BOOLEAN);
-
+    dyna_Add(ATTRs_TOLERANCE, LXsTYPE_ANGLE);
     tool_Reset();
 
     sPkt.NewVectorType(LXsCATEGORY_TOOL, v_type);
@@ -64,6 +66,7 @@ void CSelectEdgesByNormal::tool_Reset()
 {
     dyna_Value(ATTRa_OPENEDGE).SetInt(OPENEDGE_OUTVECTOR);
     dyna_Value(ATTRa_DESELECT).SetInt(0);
+    dyna_Value(ATTRa_TOLERANCE).SetFlt(0.0);
 }
 
 /*
@@ -92,7 +95,7 @@ LXtID4 CSelectEdgesByNormal::tool_Task()
  */
 unsigned CSelectEdgesByNormal::tmod_Flags()
 {
-    return LXfTMOD_I0_INPUT;
+    return LXfTMOD_I0_ATTRHAUL;
 }
 
 LxResult CSelectEdgesByNormal::tmod_Enable(ILxUnknownID obj)
@@ -221,6 +224,14 @@ bool CSelectEdgesByNormal::GetLastEdge(CLxUser_Mesh& mesh, CLxUser_Edge& edge)
     return true;
 }
 
+const char* CSelectEdgesByNormal::tmod_Haul(unsigned index)
+{
+    if (index == 0)
+        return ATTRs_TOLERANCE;
+    else
+        return nullptr;
+}
+
 void CSelectEdgesByNormal::tmod_Initialize (ILxUnknownID vts, ILxUnknownID adjust, unsigned int flags)
 {
 }
@@ -232,6 +243,13 @@ LxResult CSelectEdgesByNormal::atrui_DisableMsg (unsigned int index, ILxUnknownI
 
 LxResult CSelectEdgesByNormal::atrui_UIHints(unsigned int index, ILxUnknownID hints)
 {
+    CLxLoc_UIHints uiHints(hints);
+
+    if (index == ATTRa_TOLERANCE)
+    {
+        uiHints.MinFloat(0.0);
+        uiHints.MaxFloat(179.0 * LXx_DEG2RAD);
+    }
     return LXe_OK;
 }
 
@@ -295,7 +313,8 @@ class EdgeVisitor : public CLxImpl_AbstractVisitor
 public:
     bool Test(CLxVector& normal)
     {
-        if (MathUtil::VectorCompare(normal, m_normal))
+        double angle = MathUtil::VectorAngle(normal, m_normal);
+        if (std::abs(angle) <= m_tolerance)
         {
             return true;
         }
@@ -329,6 +348,7 @@ public:
     CLxUser_Edge    m_lastEdge;
     int             m_openEdge;
     int             m_deselect;
+    double          m_tolerance;
     std::vector<LXtEdgeID> m_edges;
 };
 
@@ -356,7 +376,12 @@ void CSelectEdgesByNormal::tool_Evaluate(ILxUnknownID vts)
     dyna_Value(ATTRa_OPENEDGE).GetInt(&vis.m_openEdge);
 
     vis.m_normal = GetEdgeNormal(vis.m_mesh, vis.m_lastEdge, vis.m_openEdge);
-    printf("** last edge normal %f %f %f\n", vis.m_normal[0], vis.m_normal[1], vis.m_normal[2]);
+    dyna_Value(ATTRa_TOLERANCE).GetFlt(&vis.m_tolerance);
+    if (vis.m_tolerance < 0.0)
+    {
+        vis.m_tolerance = 0.0;
+        dyna_Value(ATTRa_TOLERANCE).SetFlt(vis.m_tolerance);
+    }
 
     CLxUser_LayerScan  scan;
     s_layer.BeginScan(LXf_LAYERSCAN_ACTIVE | LXf_LAYERSCAN_MARKEDGES | LXf_LAYERSCAN_MARKVERTS, scan);

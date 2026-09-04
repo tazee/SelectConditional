@@ -58,6 +58,7 @@ public:
     unsigned    tmod_Flags() LXx_OVERRIDE;
 	void        tmod_Initialize (ILxUnknownID vts, ILxUnknownID adjust, unsigned int flags) LXx_OVERRIDE;
     LxResult    tmod_Enable(ILxUnknownID obj) LXx_OVERRIDE;
+    const char* tmod_Haul(unsigned index) LXx_OVERRIDE;
 
     LxResult	atrui_DisableMsg (unsigned int index, ILxUnknownID msg) LXx_OVERRIDE;
 	LxResult	atrui_UIHints   (unsigned int index, ILxUnknownID hints) LXx_OVERRIDE;

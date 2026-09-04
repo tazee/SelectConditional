@@ -1,5 +1,5 @@
 //
-// SelectEdgesByAngle - A plugin for selecting edges by edge angle
+// SelectEdgesByEdgeVector - A plugin for selecting edges by edge vector facing ratio
 //
 
 #pragma once
@@ -32,7 +32,7 @@
 
 #include <iostream>
 
-namespace EdgeByAngle
+namespace EdgeByEdgeVector
 {
 
 #ifndef LXx_OVERRIDE
@@ -44,10 +44,10 @@ namespace EdgeByAngle
  * attributes interface is inherited from the utility class.
  */
 
-class CSelectEdgesByAngle : public CLxImpl_Tool, public CLxImpl_ToolModel, public CLxDynamicAttributes, public CLxImpl_ChannelUI
+class CSelectEdgesByEdgeVector : public CLxImpl_Tool, public CLxImpl_ToolModel, public CLxDynamicAttributes, public CLxImpl_ChannelUI
 {
 public:
-    CSelectEdgesByAngle();
+    CSelectEdgesByEdgeVector();
 
     void        tool_Reset() LXx_OVERRIDE;
     LXtObjectID tool_VectorType() LXx_OVERRIDE;
@@ -65,6 +65,7 @@ public:
 
     bool TestVertex(unsigned int& primary_index);
     CLxUser_Mesh GetInstance(CLxUser_Mesh& base);
+    bool GetLastEdge(CLxUser_Mesh& mesh, CLxUser_Edge& edge);
 
     CLxUser_LogService   s_log;
     CLxUser_LayerService s_layer;
@@ -83,14 +84,6 @@ public:
     unsigned mode_select;
 	
 	LXtItemType m_itemType;
-
-    double  m_angle0;
-
-    enum ComparisonOperators {
-        OPERATOR_LESSTHAN = 0,
-        OPERATOR_EQUAL = 1,
-        OPERATOR_GREATERTHAN = 2
-    };
 };
 
 void initialize();

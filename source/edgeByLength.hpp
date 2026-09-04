@@ -59,6 +59,9 @@ public:
 	void        tmod_Initialize (ILxUnknownID vts, ILxUnknownID adjust, unsigned int flags) LXx_OVERRIDE;
     LxResult    tmod_Enable(ILxUnknownID obj) LXx_OVERRIDE;
     const char* tmod_Haul(unsigned index) LXx_OVERRIDE;
+    LxResult    tmod_Down(ILxUnknownID vts, ILxUnknownID adjust) LXx_OVERRIDE;
+    void        tmod_Move(ILxUnknownID vts, ILxUnknownID adjust) LXx_OVERRIDE;
+    void        tmod_Up(ILxUnknownID vts, ILxUnknownID adjust) LXx_OVERRIDE;
 
     LxResult	atrui_DisableMsg (unsigned int index, ILxUnknownID msg) LXx_OVERRIDE;
 	LxResult	atrui_UIHints   (unsigned int index, ILxUnknownID hints) LXx_OVERRIDE;
@@ -71,6 +74,9 @@ public:
     CLxUser_VectorType   v_type;
     CLxUser_SelectionService s_sel;
     CLxUser_MeshService mesh_svc;
+    CLxUser_View3DportService s_v3d;
+	CLxUser_ValueService	 s_val;
+    CLxUser_View3D	        m_view3D;
 
     unsigned offset_view;
     unsigned offset_screen;
@@ -84,11 +90,11 @@ public:
 	
 	LXtItemType m_itemType;
 
-    double  m_length0;
+    double  m_length, m_range1;
 
     enum ComparisonOperators {
         OPERATOR_LESSTHAN = 0,
-        OPERATOR_EQUAL = 1,
+        OPERATOR_RANGE = 1,
         OPERATOR_GREATERTHAN = 2
     };
 };
