@@ -231,6 +231,7 @@ namespace EdgeByNormal
 
     void CSelectEdgesByNormal::tmod_Initialize(ILxUnknownID vts, ILxUnknownID adjust, unsigned int flags)
     {
+        dyna_Value(ATTRa_TOLERANCE).SetFlt(0.0);
     }
 
     LxResult CSelectEdgesByNormal::atrui_DisableMsg(unsigned int index, ILxUnknownID msg)

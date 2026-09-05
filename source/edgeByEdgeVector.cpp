@@ -99,6 +99,15 @@ namespace EdgeByEdgeVector
             msg.SetMessage(SRVNAME_TOOL, "NoVertex", 0);
             return LXe_DISABLED;
         }
+
+        CLxUser_Mesh mesh;
+        CLxUser_Edge edge;
+        if (GetLastEdge(mesh, edge) == false)
+        {
+            msg.SetCode(LXe_CMD_DISABLED);
+            msg.SetMessage(SRVNAME_TOOL, "NoEdgeSelected", 0);
+            return LXe_DISABLED;
+        }
         return LXe_OK;
     }
 
@@ -112,6 +121,7 @@ namespace EdgeByEdgeVector
 
     void CSelectEdgesByEdgeVector::tmod_Initialize(ILxUnknownID vts, ILxUnknownID adjust, unsigned int flags)
     {
+        dyna_Value(ATTRa_TOLERANCE).SetFlt(0.0);
     }
 
     LxResult CSelectEdgesByEdgeVector::atrui_DisableMsg(unsigned int index, ILxUnknownID msg)
