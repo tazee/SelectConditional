@@ -133,6 +133,7 @@ LxResult CSelectEdgesByLength::tmod_Down(ILxUnknownID vts, ILxUnknownID adjust)
     auto viewId = s_v3d.Mouse (&x, &y);
     s_v3d.View (viewId, m_view3D);
     dyna_Value(ATTRa_LENGTH).GetFlt(&m_length);
+    dyna_Value(ATTRa_RANGE0).GetFlt(&m_range0);
     dyna_Value(ATTRa_RANGE1).GetFlt(&m_range1);
     return LXe_TRUE;
 }
@@ -148,17 +149,16 @@ void CSelectEdgesByLength::tmod_Move(ILxUnknownID vts, ILxUnknownID adjust)
     if (m_operator == OPERATOR_RANGE)
     {
         double range0, range1;
-        dyna_Value(ATTRa_RANGE0).GetFlt(&range0);
-        range1 = m_range1 + (spak->cx - spak->px) * m_view3D.PixelSize();
+        range0 = m_range0 - (spak->cx - spak->px) * m_view3D.PixelSize() * 0.5;
+        range1 = m_range1 + (spak->cx - spak->px) * m_view3D.PixelSize() * 0.5;
+        if (range0 < 0.0)
+            range0 = 0.0;
         if (range1 < 0.0)
             range1 = 0.0;
         if (range1 < range0)
-        {
-            at.SetFlt(ATTRa_RANGE0, range1);
-            at.SetFlt(ATTRa_RANGE1, range1);
-        }
-        else
-            at.SetFlt(ATTRa_RANGE1, range1);
+            range1 = range0;
+        at.SetFlt(ATTRa_RANGE0, range0);
+        at.SetFlt(ATTRa_RANGE1, range1);
     }
     else
     {
@@ -182,6 +182,8 @@ void CSelectEdgesByLength::tmod_Initialize(ILxUnknownID vts, ILxUnknownID adjust
     if (count == 0)
     {
         at.SetFlt(ATTRa_LENGTH, 0.0);
+        at.SetFlt(ATTRa_RANGE0, 0.0);
+        at.SetFlt(ATTRa_RANGE1, 0.0);
         return;
     }
     void*                         pkt = s_sel.ByIndex(LXiSEL_EDGE, static_cast<unsigned>(count - 1));

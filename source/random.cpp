@@ -14,7 +14,7 @@ namespace Random
 
 #define ATTRs_SEED       "seed"
 #define ATTRs_PERCENTAGE "percentage"
-#define ATTRs_DESELECT "deselect"
+#define ATTRs_DESELECT   "deselect"
 
 #define ATTRa_SEED       0
 #define ATTRa_PERCENTAGE 1
@@ -334,8 +334,8 @@ namespace Random
                     if (dist(engine) <= percentage)
                     {
                         vis.m_edge.Select(vis.m_edges[j]);
-                        LXtPointID  vrt0, vrt1;
-                        vis.m_edge.Endpoints(&vrt0, &vrt1); 
+                        LXtPointID vrt0, vrt1;
+                        vis.m_edge.Endpoints(&vrt0, &vrt1);
                         void* pkt = edge_pkt_trans.Packet(vrt0, vrt1, nullptr, mesh);
                         if (pkt)
                         {
@@ -370,7 +370,7 @@ namespace Random
                     if (dist(engine) <= percentage)
                     {
                         LXtPointID vrt = vis.m_verts[j];
-                        void* pkt = vert_pkt_trans.Packet(vrt, nullptr, mesh);
+                        void*      pkt = vert_pkt_trans.Packet(vrt, nullptr, mesh);
                         if (pkt)
                         {
                             if (deselect)

@@ -6,27 +6,26 @@
 #include <lxsdk/lx_log.hpp>
 #include <lxsdk/lx_mesh.hpp>
 #include <lxsdk/lx_value.hpp>
+#include <lxsdk/lx_vp.hpp>
 #include <lxsdk/lxu_math.hpp>
-#include <lxsdk/lxvmath.h>
 #include <lxsdk/lxu_matrix.hpp>
 #include <lxsdk/lxu_quaternion.hpp>
-#include <lxsdk/lx_vp.hpp>
+#include <lxsdk/lxvmath.h>
 
 //
 // Basic vector math functions.
 //
-namespace MathUtil {
+namespace MathUtil
+{
     static bool Compare(double a, double b)
     {
         double tol = lx::Tolerance(a) * 10.0;
         return std::abs(a - b) < tol;
     }
 
-    static bool VectorCompare (CLxVector& A, CLxVector B)
+    static bool VectorCompare(CLxVector& A, CLxVector B)
     {
-        if ((MathUtil::Compare(A[0], B[0])) &&
-            (MathUtil::Compare(A[1], B[1])) &&
-            (MathUtil::Compare(A[2], B[2])))
+        if ((MathUtil::Compare(A[0], B[0])) && (MathUtil::Compare(A[1], B[1])) && (MathUtil::Compare(A[2], B[2])))
             return true;
         else
             return false;
@@ -88,11 +87,12 @@ namespace MathUtil {
 
     static double VectorAngle(const LXtVector v0, const LXtVector v1, int normalize = 0)
     {
-        double dot = LXx_VDOT (v0, v1);
-        if (normalize) {
-            dot = dot / (LXx_VLEN (v0) * LXx_VLEN (v1));
+        double dot = LXx_VDOT(v0, v1);
+        if (normalize)
+        {
+            dot = dot / (LXx_VLEN(v0) * LXx_VLEN(v1));
         }
         dot = LXxCLAMP(dot, -1.0, 1.0);
-        return std::acos (dot);
+        return std::acos(dot);
     }
-};
+};  // namespace MathUtil
