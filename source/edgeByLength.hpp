@@ -65,7 +65,7 @@ namespace EdgeByLength
         LxResult atrui_UIHints(unsigned int index, ILxUnknownID hints) LXx_OVERRIDE;
 
         bool         TestVertex(unsigned int& primary_index);
-        CLxUser_Mesh GetInstance(CLxUser_Mesh& base);
+        CLxUser_Mesh GetInstance(CLxUser_Mesh& base, LXtMatrix4 xfrm);
 
         CLxUser_LogService        s_log;
         CLxUser_LayerService      s_layer;

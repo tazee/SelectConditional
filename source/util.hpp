@@ -12,6 +12,30 @@
 #include <lxsdk/lxu_quaternion.hpp>
 #include <lxsdk/lxvmath.h>
 
+#include <lxsdk/lxu_attributes.hpp>
+#include <lxsdk/lxu_math.hpp>
+#include <lxsdk/lxu_select.hpp>
+#include <lxsdk/lxu_vector.hpp>
+
+#include <lxsdk/lx_channelui.hpp>
+#include <lxsdk/lx_draw.hpp>
+#include <lxsdk/lx_handles.hpp>
+#include <lxsdk/lx_layer.hpp>
+#include <lxsdk/lx_log.hpp>
+#include <lxsdk/lx_mesh.hpp>
+#include <lxsdk/lx_plugin.hpp>
+#include <lxsdk/lx_pmodel.hpp>
+#include <lxsdk/lx_seltypes.hpp>
+#include <lxsdk/lx_tool.hpp>
+#include <lxsdk/lx_toolui.hpp>
+#include <lxsdk/lx_vector.hpp>
+#include <lxsdk/lx_vmodel.hpp>
+#include <lxsdk/lx_vp.hpp>
+
+#include <lxsdk/lx_select.hpp>
+#include <lxsdk/lx_seltypes.hpp>
+#include <lxsdk/lx_value.hpp>
+
 //
 // Basic vector math functions.
 //
@@ -96,3 +120,49 @@ namespace MathUtil
         return std::acos(dot);
     }
 };  // namespace MathUtil
+namespace ModoUtil
+{
+    static void GetWorkPlane(LXtMatrix4 m4)
+    {
+        lx::Matrix4Ident(m4);
+        CLxUser_SelectionService s_sel;
+        LXtID4 selID_scene = s_sel.LookupType(LXsSELTYP_SCENE);
+        CLxUser_ScenePacketTranslation scenePkt;
+        scenePkt.autoInit();
+
+        void* pkt = s_sel.Recent(selID_scene);
+        if (pkt != nullptr)
+        {
+            CLxUser_ChannelRead  chanRead;
+            LXtVector            wpPos;
+            LXtMatrix            wpRot;
+            CLxUser_Scene      scene;
+        
+            scenePkt.GetScene(pkt, scene);
+            scene.GetChannels(chanRead, 0.0);
+            scene.WorkPlaneRotation(chanRead, wpRot);
+            scene.WorkPlanePosition(chanRead, wpPos);
+            /*
+            printf("wpPos: %f, %f, %f\n", wpPos[0], wpPos[1], wpPos[2]);
+            printf("wpRot: %f, %f, %f\n", wpRot[0][0], wpRot[0][1], wpRot[0][2]);
+            printf("       %f, %f, %f\n", wpRot[1][0], wpRot[1][1], wpRot[1][2]);
+            printf("       %f, %f, %f\n", wpRot[2][0], wpRot[2][1], wpRot[2][2]);
+            */
+            lx::Matrix4SetSubMatrix(m4, wpRot, 0);
+            lx::MatrixTranspose(wpRot);
+            lx::MatrixMultiply(m4[3], wpRot, wpPos);
+            LXx_VNEG(m4[3]);
+            /*
+            printf("m4 : %f, %f, %f, %f\n", m4[0][0], m4[0][1], m4[0][2], m4[0][3]);
+            printf("     %f, %f, %f, %f\n", m4[1][0], m4[1][1], m4[1][2], m4[1][3]);
+            printf("     %f, %f, %f, %f\n", m4[2][0], m4[2][1], m4[2][2], m4[2][3]);
+            printf("     %f, %f, %f, %f\n", m4[3][0], m4[3][1], m4[3][2], m4[3][3]);
+            LXtMatrix m3;
+            lx::Matrix4GetSubMatrix(m4, m3, 0);
+            printf("m3: %f, %f, %f\n", m3[0][0], m3[0][1], m3[0][2]);
+            printf("    %f, %f, %f\n", m3[1][0], m3[1][1], m3[1][2]);
+            printf("    %f, %f, %f\n", m3[2][0], m3[2][1], m3[2][2]);
+            */
+        }
+    }
+};

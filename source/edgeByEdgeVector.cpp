@@ -102,7 +102,8 @@ namespace EdgeByEdgeVector
 
         CLxUser_Mesh mesh;
         CLxUser_Edge edge;
-        if (GetLastEdge(mesh, edge) == false)
+        LXtMatrix4 xfrm;
+        if (GetLastEdge(mesh, edge, xfrm) == false)
         {
             msg.SetCode(LXe_CMD_DISABLED);
             msg.SetMessage(SRVNAME_TOOL, "NoEdgeSelected", 0);
@@ -178,7 +179,7 @@ namespace EdgeByEdgeVector
         return ok;
     }
 
-    CLxUser_Mesh CSelectEdgesByEdgeVector::GetInstance(CLxUser_Mesh& base)
+    CLxUser_Mesh CSelectEdgesByEdgeVector::GetInstance(CLxUser_Mesh& base, LXtMatrix4 xfrm)
     {
         CLxUser_LayerScan scan;
         s_layer.BeginScan(LXf_LAYERSCAN_ACTIVE, scan);
@@ -190,13 +191,14 @@ namespace EdgeByEdgeVector
             if (mesh_svc.MeshToMeshID(mesh) == mesh_svc.MeshToMeshID(base))
             {
                 scan.MeshInstance(i, mesh);
+                scan.MeshTransform(i, xfrm);
                 return mesh;
             }
         }
         return base;
     }
 
-    static CLxVector GetEdgeVector(CLxUser_Mesh& mesh, CLxUser_Edge& edge)
+    static CLxVector GetEdgeVector(CLxUser_Mesh& mesh, CLxUser_Edge& edge, LXtMatrix4 xfrm)
     {
         LXtPointID vrt0, vrt1;
         edge.Endpoints(&vrt0, &vrt1);
@@ -208,13 +210,15 @@ namespace EdgeByEdgeVector
         point.Pos(pos0);
         point.Select(vrt1);
         point.Pos(pos1);
+        lx::Matrix4Multiply(pos0, xfrm, pos0);
+        lx::Matrix4Multiply(pos1, xfrm, pos1);
         LXx_VSUB(pos1, pos0);
         CLxVector vec(pos1);
         vec.normalize();
         return vec;
     }
 
-    bool CSelectEdgesByEdgeVector::GetLastEdge(CLxUser_Mesh& mesh, CLxUser_Edge& edge)
+    bool CSelectEdgesByEdgeVector::GetLastEdge(CLxUser_Mesh& mesh, CLxUser_Edge& edge, LXtMatrix4 xfrm)
     {
         int count = s_sel.Count(LXiSEL_EDGE);
         if (count == 0)
@@ -227,7 +231,7 @@ namespace EdgeByEdgeVector
         LXtPointID vrt0, vrt1;
         edge_pkt_trans.Vertices(pkt, &vrt0, &vrt1);
         edge_pkt_trans.GetMesh(pkt, mesh);
-        CLxUser_Mesh inst = GetInstance(mesh);
+        CLxUser_Mesh inst = GetInstance(mesh, xfrm);
         edge.fromMesh(inst);
         edge.SelectEndpoints(vrt0, vrt1);
         return true;
@@ -254,7 +258,7 @@ namespace EdgeByEdgeVector
                     return LXe_OK;
             }
 
-            CLxVector vector = GetEdgeVector(m_mesh, m_edge);
+            CLxVector vector = GetEdgeVector(m_mesh, m_edge, m_xfrm);
 
             if (Test(vector) == true)
             {
@@ -278,6 +282,7 @@ namespace EdgeByEdgeVector
         LXtMarkMode            m_mark_pick;
         CLxVector              m_vector;
         CLxUser_Edge           m_lastEdge;
+        LXtMatrix4             m_xfrm;
         int                    m_deselect;
         double                 m_tolerance;
         std::vector<LXtEdgeID> m_edges;
@@ -302,10 +307,10 @@ namespace EdgeByEdgeVector
 
         EdgeVisitor vis;
 
-        if (GetLastEdge(vis.m_mesh, vis.m_lastEdge) == false)
+        if (GetLastEdge(vis.m_mesh, vis.m_lastEdge, vis.m_xfrm) == false)
             return;
 
-        vis.m_vector = GetEdgeVector(vis.m_mesh, vis.m_lastEdge);
+        vis.m_vector = GetEdgeVector(vis.m_mesh, vis.m_lastEdge, vis.m_xfrm);
         dyna_Value(ATTRa_TOLERANCE).GetFlt(&vis.m_tolerance);
         if (vis.m_tolerance < 0.0)
         {
@@ -327,11 +332,13 @@ namespace EdgeByEdgeVector
         for (auto i = 0u; i < n; i++)
         {
             CLxUser_Mesh mesh;
+            vis.m_edges.clear();
             scan.MeshInstance(i, mesh);
             vis.m_mesh = mesh;
             vis.m_edge.fromMesh(mesh);
             vis.m_vert.fromMesh(mesh);
             vis.m_mark_pick = mesh_svc.SetMode(LXsMARK_SELECT);
+            scan.MeshTransform(i, vis.m_xfrm);
 
             vis.m_edge.Enum(&vis, LXiMARK_ANY);
 

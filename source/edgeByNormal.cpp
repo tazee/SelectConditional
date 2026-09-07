@@ -110,7 +110,8 @@ namespace EdgeByNormal
 
         CLxUser_Mesh mesh;
         CLxUser_Edge edge;
-        if (GetLastEdge(mesh, edge) == false)
+        LXtMatrix4   xfrm;
+        if (GetLastEdge(mesh, edge, xfrm) == false)
         {
             msg.SetCode(LXe_CMD_DISABLED);
             msg.SetMessage(SRVNAME_TOOL, "NoEdgeSelected", 0);
@@ -119,8 +120,10 @@ namespace EdgeByNormal
         return LXe_OK;
     }
 
-    static CLxVector GetEdgeNormal(CLxUser_Mesh& mesh, CLxUser_Edge& edge, int openEdge)
+    static CLxVector GetEdgeNormal(CLxUser_Mesh& mesh, CLxUser_Edge& edge, int openEdge, LXtMatrix4 xfrm)
     {
+        LXtMatrix m3;
+        lx::Matrix4GetSubMatrix(xfrm, m3, 1);
         LXtPointID vrt0, vrt1;
         edge.Endpoints(&vrt0, &vrt1);
 
@@ -130,7 +133,7 @@ namespace EdgeByNormal
         edge.PolygonCount(&count);
         if ((count == 1) && (openEdge == CSelectEdgesByNormal::OPENEDGE_POLYNORMAL))
         {
-            LXtVector    norm0;
+            LXtVector    norm0, norm1;
             LXtPolygonID polyID;
             edge.PolygonByIndex(0, &polyID);
             poly.Select(polyID);
@@ -139,14 +142,15 @@ namespace EdgeByNormal
             if ((type == LXiPTYP_FACE) || (type == LXiPTYP_SUBD) || (type == LXiPTYP_PSUB))
             {
                 poly.Normal(norm0);
-                CLxVector normal(norm0);
+                lx::MatrixMultiply(norm1, m3, norm0);
+                CLxVector normal(norm1);
                 normal.normalize();
                 return normal;
             }
         }
         else if ((count == 1) && (openEdge == CSelectEdgesByNormal::OPENEDGE_OUTVECTOR))
         {
-            LXtVector    norm0;
+            LXtVector    norm0, norm1;
             LXtPolygonID polyID;
             edge.PolygonByIndex(0, &polyID);
             poly.Select(polyID);
@@ -162,6 +166,8 @@ namespace EdgeByNormal
                 point.Pos(pos0);
                 point.Select(vrt1);
                 point.Pos(pos1);
+                //lx::Matrix4Multiply(pos0, xfrm, pos0);
+                //lx::Matrix4Multiply(pos1, xfrm, pos1);
                 LXtVector    edgeVec, outVec;
                 unsigned int i0, i1, nvert;
                 poly.PointIndex(vrt0, &i0);
@@ -172,7 +178,9 @@ namespace EdgeByNormal
                 else
                     LXx_VSUB3(edgeVec, pos0, pos1);
                 LXx_VCROSS(outVec, edgeVec, norm0);
-                CLxVector normal(outVec);
+                lx::VectorNormalize(outVec);
+                lx::MatrixMultiply(norm1, m3, outVec);
+                CLxVector normal(norm1);
                 normal.normalize();
                 return normal;
             }
@@ -190,9 +198,10 @@ namespace EdgeByNormal
                 poly.Type(&type);
                 if ((type == LXiPTYP_FACE) || (type == LXiPTYP_SUBD) || (type == LXiPTYP_PSUB))
                 {
-                    LXtVector norm0;
+                    LXtVector norm0, norm1;
                     poly.Normal(norm0);
-                    LXx_VADD(vec, norm0);
+                    lx::MatrixMultiply(norm1, m3, norm0);
+                    LXx_VADD(vec, norm1);
                 }
             }
             CLxVector normal(vec);
@@ -202,7 +211,7 @@ namespace EdgeByNormal
         return CLxVector(0.0, 1.0, 0.0);
     }
 
-    bool CSelectEdgesByNormal::GetLastEdge(CLxUser_Mesh& mesh, CLxUser_Edge& edge)
+    bool CSelectEdgesByNormal::GetLastEdge(CLxUser_Mesh& mesh, CLxUser_Edge& edge, LXtMatrix4 xfrm)
     {
         int count = s_sel.Count(LXiSEL_EDGE);
         if (count == 0)
@@ -215,7 +224,7 @@ namespace EdgeByNormal
         LXtPointID vrt0, vrt1;
         edge_pkt_trans.Vertices(pkt, &vrt0, &vrt1);
         edge_pkt_trans.GetMesh(pkt, mesh);
-        CLxUser_Mesh inst = GetInstance(mesh);
+        CLxUser_Mesh inst = GetInstance(mesh, xfrm);
         edge.fromMesh(inst);
         edge.SelectEndpoints(vrt0, vrt1);
         return true;
@@ -288,8 +297,9 @@ namespace EdgeByNormal
         return ok;
     }
 
-    CLxUser_Mesh CSelectEdgesByNormal::GetInstance(CLxUser_Mesh& base)
+    CLxUser_Mesh CSelectEdgesByNormal::GetInstance(CLxUser_Mesh& base, LXtMatrix4 xfrm)
     {
+        lx::Matrix4Ident(xfrm);
         CLxUser_LayerScan scan;
         s_layer.BeginScan(LXf_LAYERSCAN_ACTIVE, scan);
         auto n = scan.NumLayers();
@@ -300,6 +310,7 @@ namespace EdgeByNormal
             if (mesh_svc.MeshToMeshID(mesh) == mesh_svc.MeshToMeshID(base))
             {
                 scan.MeshInstance(i, mesh);
+                scan.MeshTransform(i, xfrm);
                 return mesh;
             }
         }
@@ -327,7 +338,7 @@ namespace EdgeByNormal
                     return LXe_OK;
             }
 
-            CLxVector normal = GetEdgeNormal(m_mesh, m_edge, m_openEdge);
+            CLxVector normal = GetEdgeNormal(m_mesh, m_edge, m_openEdge, m_xfrm);
 
             if (Test(normal) == true)
             {
@@ -344,6 +355,7 @@ namespace EdgeByNormal
         LXtMarkMode            m_mark_pick;
         CLxVector              m_normal;
         CLxUser_Edge           m_lastEdge;
+        LXtMatrix4             m_xfrm;
         int                    m_openEdge;
         int                    m_deselect;
         double                 m_tolerance;
@@ -367,13 +379,17 @@ namespace EdgeByNormal
         if (!viewEvent || viewEvent->type != LXi_VIEWTYPE_3D)
             return;
 
+        //LXtMatrix4 wp;
+        //ModoUtil::GetWorkPlane(wp);
+
         EdgeVisitor vis;
 
-        if (GetLastEdge(vis.m_mesh, vis.m_lastEdge) == false)
+        if (GetLastEdge(vis.m_mesh, vis.m_lastEdge, vis.m_xfrm) == false)
             return;
         dyna_Value(ATTRa_OPENEDGE).GetInt(&vis.m_openEdge);
 
-        vis.m_normal = GetEdgeNormal(vis.m_mesh, vis.m_lastEdge, vis.m_openEdge);
+        vis.m_normal = GetEdgeNormal(vis.m_mesh, vis.m_lastEdge, vis.m_openEdge, vis.m_xfrm);
+        //printf("** base normal: %f, %f, %f\n", vis.m_normal[0], vis.m_normal[1], vis.m_normal[2]);
         dyna_Value(ATTRa_TOLERANCE).GetFlt(&vis.m_tolerance);
         if (vis.m_tolerance < 0.0)
         {
@@ -395,13 +411,18 @@ namespace EdgeByNormal
         for (auto i = 0u; i < n; i++)
         {
             CLxUser_Mesh mesh;
+            vis.m_edges.clear();
             scan.MeshInstance(i, mesh);
             vis.m_mesh = mesh;
             vis.m_edge.fromMesh(mesh);
             vis.m_vert.fromMesh(mesh);
             vis.m_mark_pick = mesh_svc.SetMode(LXsMARK_SELECT);
+            scan.MeshTransform(i, vis.m_xfrm);
+            //lx::Matrix4Multiply(vis.m_xfrm, wp);
 
             vis.m_edge.Enum(&vis, LXiMARK_ANY);
+
+            scan.MeshBase(i, mesh);
 
             for (auto j = 0u; j < vis.m_edges.size(); j++)
             {

@@ -178,7 +178,7 @@ namespace Random
         return ok;
     }
 
-    CLxUser_Mesh CRandom::GetInstance(CLxUser_Mesh& base)
+    CLxUser_Mesh CRandom::GetInstance(CLxUser_Mesh& base, LXtMatrix4 xfrm)
     {
         CLxUser_LayerScan scan;
         s_layer.BeginScan(LXf_LAYERSCAN_ACTIVE, scan);
@@ -190,6 +190,7 @@ namespace Random
             if (mesh_svc.MeshToMeshID(mesh) == mesh_svc.MeshToMeshID(base))
             {
                 scan.MeshInstance(i, mesh);
+                scan.MeshTransform(i, xfrm);
                 return mesh;
             }
         }
@@ -215,6 +216,7 @@ namespace Random
         CLxUser_Edge              m_edge;
         CLxUser_Point             m_vert;
         LXtMarkMode               m_mark_pick;
+        LXtMatrix4                m_xfrm;
         std::vector<LXtPolygonID> m_polys;
         std::vector<LXtEdgeID>    m_edges;
         std::vector<LXtPointID>   m_verts;
@@ -277,6 +279,10 @@ namespace Random
             vis.m_type      = subject.Type();
             vis.m_mesh      = mesh;
             vis.m_mark_pick = mesh_svc.SetMode(LXsMARK_SELECT);
+            vis.m_polys.clear();
+            vis.m_edges.clear();
+            vis.m_verts.clear();
+            scan.MeshTransform(i, vis.m_xfrm);
 
             if (vis.m_type == LXiSEL_POLYGON)
             {

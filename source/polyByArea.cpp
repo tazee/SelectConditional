@@ -198,7 +198,8 @@ namespace PolyByArea
         poly_pkt_trans.Polygon(pkt, &pol);
         CLxUser_Mesh mesh;
         poly_pkt_trans.GetMesh(pkt, mesh);
-        CLxUser_Mesh    inst = GetInstance(mesh);
+        LXtMatrix4 xfrm;
+        CLxUser_Mesh    inst = GetInstance(mesh, xfrm);
         CLxUser_Polygon poly;
         poly.fromMesh(inst);
         poly.Select(pol);
@@ -278,7 +279,7 @@ namespace PolyByArea
         return ok;
     }
 
-    CLxUser_Mesh CSelectPolysByArea::GetInstance(CLxUser_Mesh& base)
+    CLxUser_Mesh CSelectPolysByArea::GetInstance(CLxUser_Mesh& base, LXtMatrix4 xfrm)
     {
         CLxUser_LayerScan scan;
         s_layer.BeginScan(LXf_LAYERSCAN_ACTIVE, scan);
@@ -290,6 +291,7 @@ namespace PolyByArea
             if (mesh_svc.MeshToMeshID(mesh) == mesh_svc.MeshToMeshID(base))
             {
                 scan.MeshInstance(i, mesh);
+                scan.MeshTransform(i, xfrm);
                 return mesh;
             }
         }
@@ -337,6 +339,7 @@ namespace PolyByArea
         CLxUser_Polygon           m_poly;
         CLxUser_Point             m_vert;
         LXtMarkMode               m_mark_pick;
+        LXtMatrix4                m_xfrm;
         double                    m_area;
         double                    m_range0;
         double                    m_range1;
@@ -388,11 +391,13 @@ namespace PolyByArea
         for (auto i = 0u; i < n; i++)
         {
             CLxUser_Mesh mesh;
+            vis.m_polys.clear();
             scan.MeshInstance(i, mesh);
             vis.m_mesh = mesh;
             vis.m_poly.fromMesh(mesh);
             vis.m_vert.fromMesh(mesh);
             vis.m_mark_pick = mesh_svc.SetMode(LXsMARK_SELECT);
+            scan.MeshTransform(i, vis.m_xfrm);
 
             vis.m_poly.Enum(&vis, LXiMARK_ANY);
 
